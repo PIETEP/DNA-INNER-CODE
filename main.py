@@ -3,6 +3,7 @@ import sys
 import math
 import numpy as np
 from numpy.random import *
+import factor_graph
 
 def Readparam(filename):
     parameterlist=[]
@@ -42,6 +43,7 @@ def entropy(priorlist):
         entropy.append(temp)
     #print(entropy)
 
+
 def GetRndWord(block_length,period,priorlist):
     cordword=[]
     for i in range(block_length):
@@ -70,6 +72,10 @@ def substitution(enki,probability):
         return Nucleotide[1]
     else:
         return Nucleotide[2]
+
+def argmax_ndim(arg_array):
+    return np.unravel_index(arg_array.argmax(), arg_array.shape)
+
 
 
 def transmit(block_length,pa,pid,maxdrift,cordword,ps):
@@ -125,7 +131,7 @@ def SetPriorCordword(cordword,block_length,priorlist,period,nofcopy):
         for j in range(4):
             if cordword[i]==bin(j):
                 PriorCordword.append(priorlist[i%period][j])
-    print("SetPriorCordword",PriorCordword)
+    #print("SetPriorCordword",PriorCordword)
 
     return PriorCordword
 
@@ -138,236 +144,15 @@ def Setupmessage():
         return PriorCordword
 '''
 
-def SetUpleftmessage(block_length,maxdrift,period,pid,ps,priorlist,Z):
-    leftmessage = [[0 for i in range(2 * maxdrift + 1)] for j in range(block_length)]
-    for k in range(2*maxdrift+1):
-        leftmessage[block_length-1][k]=1
-    print("deciding leftmessage")
-    for i in range(block_length - 1,0,-1):
-        for xi in range(4):
-            if i < 3:
-                for di in range(-1-i, i + 2):
-                    if i + di > len(Z) - 1:
-                        continue;
-                    for beforedi in range(di-1, di + 2):
-                        if i + beforedi > len(Z) - 1 or beforedi < -i or beforedi >=i+1:
-                            continue;
-                        if beforedi == di:
-                            ditonextdiprob = 1 - pid
-                            if bin(xi) == Z[i+beforedi]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                        elif beforedi == di - 1:
-                            ditonextdiprob = pid
-                            aboutZprobability = 1
-                        else:
-                            ditonextdiprob = pid
-                            if bin(xi) == Z[i + beforedi]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + beforedi - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        #print(i,beforedi)
-                        leftmessage[i - 1][beforedi+maxdrift] += priorlist[i % period][xi] * ditonextdiprob * aboutZprobability * \
-                                               leftmessage[i][beforedi+maxdrift]
-            else:
-                for di in range(-maxdrift, maxdrift+1):
-                    if i + di > len(Z) - 1:
-                        continue;
-                    for beforedi in range(di-1, di + 2):
-                        if i + beforedi > len(Z) - 1 or beforedi < -maxdrift or beforedi > maxdrift:
-                            continue;
-                        if beforedi == di:
-                            ditonextdiprob = 1 - pid
-                            if bin(xi) == Z[i+beforedi]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                        elif beforedi == di - 1:
-                            ditonextdiprob = pid
-                            aboutZprobability = 1
-                        else:
-                            ditonextdiprob = pid
-                            if bin(xi) == Z[i + beforedi]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + beforedi - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        #print(beforedi)
-                        leftmessage[i - 1][beforedi+maxdrift] += priorlist[i % period][xi] * ditonextdiprob * aboutZprobability * \
-                                               leftmessage[i][di+maxdrift]
-                        #print(i,di,beforedi,leftmessage[i-1][beforedi+maxdrift],leftmessage[i][beforedi+maxdrift])
-    #print(leftmessage)
-    return leftmessage
-
-
-def SetUprightmessage(block_length,maxdrift,period,pid,ps,priorlist,Z):
-    rightmessage=[[0 for i in range(2*maxdrift+1)] for j in range(block_length)]
-    rightmessage[0][maxdrift] = 1
-    print("deciding rightmessage")
-    for i in range(0, block_length - 1):
-        for xi in range(4):
-            if i < maxdrift:
-                for di in range(-i, i + 1):
-                    if i + di > len(Z) - 1:
-                        continue;
-                    for nextdi in range(di - 1, di + 2):
-                        if i + nextdi > len(Z) - 1:
-                            continue;
-                        if nextdi == di:
-                            ditonextdiprob = 1 - pid
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-
-                        elif nextdi == di - 1:
-                            ditonextdiprob = pid
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + di - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        else:
-                            ditonextdiprob = pid
-                            aboutZprobability = 1
-                        rightmessage[i + 1][nextdi + maxdrift] += priorlist[i % period][xi] * ditonextdiprob * aboutZprobability * \
-                                                                 rightmessage[i][di + maxdrift]
-            else:
-                for di in range(-maxdrift, maxdrift+1):
-                    if i + di > len(Z) - 1:
-                        continue;
-                    for nextdi in range(di - 1, di + 2):
-                        if i + nextdi > len(Z) - 1 or nextdi > maxdrift or nextdi <-maxdrift:
-                            continue;
-                        if nextdi == di:
-                            ditonextdiprob = 1 - pid
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                        elif nextdi == di - 1:
-                            ditonextdiprob = pid
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + di - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        else:
-                            ditonextdiprob = pid
-                            aboutZprobability = 1
-                        #print(rightmessage[i + 1], ditonextdiprob, aboutZprobability)
-                        rightmessage[i + 1][nextdi + maxdrift] += priorlist[i % period][xi] * ditonextdiprob * aboutZprobability * \
-                                                                 rightmessage[i][di + maxdrift]
-
-    #print(rightmessage)
-    return rightmessage
-
-def SetUpDownmessage(block_length,maxdrift,period,pid,ps,priorlist,Z,leftmessage,rightmessage):
-    downmessage=[[0 for i in range(4)] for j in range(block_length)]
-    for i in range(block_length):
-        if i<maxdrift:
-            for di in range(-i,i+1):
-                if i+di>len(Z)-1:
-                    continue;
-                for nextdi in range(di-1,di+2):
-                    if i+nextdi>len(Z)-1:
-                        continue;
-                    elif di==nextdi:
-                        ditonextdiprob=1-pid
-                    else:
-                        ditonextdiprob=pid
-                    for xi in range(4):
-                        if di==nextdi:
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                        elif nextdi==di-1:
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + di - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        else:
-                            aboutZprobability = 1
-
-                        downmessage[i][xi]+=ditonextdiprob*aboutZprobability*rightmessage[i][di+maxdrift]*leftmessage[i][nextdi+maxdrift]
-                        #print(i, ditonextdiprob,aboutZprobability,rightmessage[i][di+maxdrift],leftmessage[i][nextdi+maxdrift],downmessage[i][xi])
-        else:
-            for di in range(-maxdrift,maxdrift+1):
-                if i+di>len(Z)-1:
-                    continue;
-                for nextdi in range(di-1,di+2):
-                    if i+nextdi>len(Z)-1 or nextdi>maxdrift or nextdi<-maxdrift:
-                        continue;
-                    elif di==nextdi:
-                        ditonextdiprob=1-pid
-                    else:
-                        ditonextdiprob=pid
-                    for xi in range(4):
-                        if di==nextdi:
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                        elif nextdi==di-1:
-                            if bin(xi) == Z[i + di]:
-                                aboutZprobability = 1 - ps
-                            else:
-                                aboutZprobability = ps / 3
-                            if bin(xi) == Z[i + di - 1]:
-                                aboutZprobability *= (1 - ps)
-                            else:
-                                aboutZprobability *= (ps / 3)
-                        else:
-                            aboutZprobability = 1
-                        downmessage[i][xi]+=ditonextdiprob*aboutZprobability*rightmessage[i][di+maxdrift]*leftmessage[i][nextdi+maxdrift]
-    print(downmessage)
-    return downmessage
-
-
-
-
-
-
-def factor_graph(block_length,Z,copy_index,decode_index,maxdrift,period,pid,ps,priorlist):
-    if decode_index == 0:
-        upmessage = np.tile(priorlist,(int(block_length/period),1))
-    else:
-        upmessage = 5#NextPrior[copy_index]
-    print(upmessage,Z)
-    #initial drift is zero
-    rightmessage=SetUprightmessage(block_length,maxdrift,period,pid,ps,priorlist,Z)
-    leftmessage=SetUpleftmessage(block_length,maxdrift,period,pid,ps,priorlist,Z)
-    downmessage=SetUpDownmessage(block_length,maxdrift,period,pid,ps,priorlist,Z,leftmessage,rightmessage)
-    #NextPrior=
-
-
 
 #sys.argv[1] is Channel Parameter file
 block_length,pa,pid,maxdrift,ps,nofcopy,decordtimes=Readparam(sys.argv[1])
+Allowable_error_count=int(nofcopy-1//2)
 #sys,argv[2] is prior file
 priorlist,period=Originalprior(sys.argv[2])
 entropy(priorlist)
 cordword=GetRndWord(block_length,period,priorlist)
-PriorCordword=SetPriorCordword(cordword,block_length,priorlist,period,nofcopy)
+#PriorCordword=SetPriorCordword(cordword,block_length,priorlist,period,nofcopy)
 
 '''
 downmessage=[[0 for i in range(block_length)] for j in range(nofcopy)]
@@ -381,10 +166,44 @@ CopyZ=[]
 for copy_index in range(nofcopy):
     CopyZ.append(transmit(block_length, pa, pid, maxdrift, cordword, ps))
 print(CopyZ)
+NextPrior=np.tile(priorlist,(int(block_length/period),1))
+#print('NextPrior',NextPrior)
 for decode_index in range(decordtimes):
     for copy_index in range(nofcopy):
         #print(CopyZ[copy_index])
 
+        normalized_out_probability=factor_graph.factor_graph(block_length,CopyZ[copy_index],maxdrift,NextPrior,period,pid,ps,priorlist)
+        if copy_index!=0:
+            out_probability_list=np.dstack([out_probability_list,normalized_out_probability])
+        else:
+            out_probability_list=normalized_out_probability
+    #print(out_probability_list)
 
-        factor_graph(block_length,CopyZ[copy_index],copy_index,decode_index,maxdrift,period,pid,ps,priorlist)
+    #print(out_probability_list[0][0])
+    #in case nofcopy=3
+    for i in range(NextPrior.shape[0]):
+        for j in range(NextPrior.shape[1]):
+            NextPrior[i][j]=out_probability_list[i][j][0]*out_probability_list[i][j][1]*out_probability_list[i][j][2]+\
+                            out_probability_list[i][j][0]*out_probability_list[i][j][1]*(1-out_probability_list[i][j][2])+\
+                            out_probability_list[i][j][0]*(1-out_probability_list[i][j][1])*out_probability_list[i][j][2]+\
+                            (1-out_probability_list[i][j][0])*out_probability_list[i][j][1]*out_probability_list[i][j][2]
+    #print(NextPrior)
+    sum_NextPrior=np.sum(NextPrior,axis=1)
+    #print(sum_NextPrior)
+    div=(np.tile(sum_NextPrior,(4,1))).T
+    #print(div)
+    NextPrior=NextPrior/div
+    #print(NextPrior)
+
+decode_word=[]
+errorcount=0
+for i in range(NextPrior.shape[0]):
+    predicted_base=argmax_ndim(NextPrior[i])
+    #print(predicted_base[0])
+    decode_word.append(bin(predicted_base[0]))
+    if decode_word[i]!=cordword[i]:
+        errorcount+=1
+
+print(decode_word)
+print(errorcount/block_length)
 
