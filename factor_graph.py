@@ -1,7 +1,6 @@
 import numpy as np
 
 
-
 def factor_graph(block_length,Z,maxdrift,NextPrior,period,pid,ps,priorlist):
     upmessage=NextPrior
     #print(upmessage,Z)
@@ -19,11 +18,12 @@ def factor_graph(block_length,Z,maxdrift,NextPrior,period,pid,ps,priorlist):
     #print(normalize_out_probability)
     return normalize_out_probability
 
+
 def SetUpleftmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
     leftmessage = [[0 for i in range(2 * maxdrift + 1)] for j in range(block_length)]
     for k in range(2*maxdrift+1):
         leftmessage[block_length-1][k]=1
-    print("deciding leftmessage")
+    #print("deciding leftmessage")
     for i in range(block_length - 1,0,-1):
         for xi in range(4):
             if i < 3:
@@ -93,10 +93,11 @@ def SetUpleftmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
     return leftmessage
 
 
+
 def SetUprightmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
     rightmessage=[[0 for i in range(2*maxdrift+1)] for j in range(block_length)]
     rightmessage[0][maxdrift] = 1
-    print("deciding rightmessage")
+    #print("deciding rightmessage")
     for i in range(0, block_length - 1):
         for xi in range(4):
             if i < maxdrift:
@@ -163,6 +164,7 @@ def SetUprightmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
         rightmessage[i+1]=rightmessage_array_normalize.tolist()
     #print(rightmessage)
     return rightmessage
+
 
 def SetUpDownmessage(block_length,maxdrift,period,pid,ps,priorlist,Z,leftmessage,rightmessage):
     downmessage=[[0 for i in range(4)] for j in range(block_length)]
