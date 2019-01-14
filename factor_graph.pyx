@@ -1,7 +1,7 @@
 import numpy as np
+cimport  numpy as cnp
 
-
-def factor_graph(block_length,Z,maxdrift,NextPrior,period,pid,ps,priorlist):
+def factor_graph(int block_length,list Z,int maxdrift,cnp.ndarray NextPrior,int period,double pid,double ps,list priorlist):
     upmessage=NextPrior
     #print(upmessage,Z)
     #initial drift is zero
@@ -18,9 +18,12 @@ def factor_graph(block_length,Z,maxdrift,NextPrior,period,pid,ps,priorlist):
     #print(normalize_out_probability)
     return normalize_out_probability
 
+def SetUpleftmessage(int block_length,int maxdrift,int period,double pid,double ps,cnp.ndarray upmessage,list Z):
+    cdef int i,j,k,di,beforedi,xi
+    cdef double ditonextdiprob,aboutZprobability
+    cdef list leftmessage = [[0 for i in range(2 * maxdrift + 1)] for j in range(block_length)]
 
-def SetUpleftmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
-    leftmessage = [[0 for i in range(2 * maxdrift + 1)] for j in range(block_length)]
+
     for k in range(2*maxdrift+1):
         leftmessage[block_length-1][k]=1
     #print("deciding leftmessage")
@@ -93,9 +96,10 @@ def SetUpleftmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
     return leftmessage
 
 
-
-def SetUprightmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
-    rightmessage=[[0 for i in range(2*maxdrift+1)] for j in range(block_length)]
+def SetUprightmessage(int block_length,int maxdrift,int period,double pid,double ps,cnp.ndarray upmessage,list Z):
+    cdef int i,j,k,di,nextdi,xi
+    cdef double ditonextdiprob,aboutZprobability
+    cdef list rightmessage=[[0 for i in range(2*maxdrift+1)] for j in range(block_length)]
     rightmessage[0][maxdrift] = 1
     #print("deciding rightmessage")
     for i in range(0, block_length - 1):
@@ -165,9 +169,10 @@ def SetUprightmessage(block_length,maxdrift,period,pid,ps,upmessage,Z):
     #print(rightmessage)
     return rightmessage
 
-
-def SetUpDownmessage(block_length,maxdrift,period,pid,ps,priorlist,Z,leftmessage,rightmessage):
-    downmessage=[[0 for i in range(4)] for j in range(block_length)]
+def SetUpDownmessage(int block_length,int maxdrift,int period,double pid,double ps,list priorlist,list Z,list leftmessage,list rightmessage):
+    cdef int i,j,k,di,beforedi,xi
+    cdef double ditonextdiprob,aboutZprobability
+    cdef list downmessage=[[0 for i in range(4)] for j in range(block_length)]
     for i in range(block_length):
         if i<maxdrift:
             for di in range(-i,i+1):
