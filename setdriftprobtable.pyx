@@ -1,3 +1,5 @@
+import numpy as np
+
 def setprobtable(maxdrift,pd,pi,ps):
 
 
@@ -54,8 +56,8 @@ def setjointdriftprobtable(DriftProbTable,maxdrift):
 
 
 def setZprobtable(JointDriftProbTable,maxdrift,ps):
-    ZProbTable=[[[[[[[0 for nofs in range(7)] for thirdnextdrift in range(3)] for thirddrift in range(2*maxdrift+1)] for secondnextdrift in range(3)] for seconddrift in range(2*maxdrift+1)\
-                        ] for firstnextdrift in range(3)] for firstdrift in range(2*maxdrift+1)] 
+    messagesize=2*maxdrift+1
+    ZProbTable=np.zeros((messagesize,3,messagesize,3,messagesize,3,7),dtype=float) 
     for firstdrift in range(2*maxdrift+1):
         for firstnextdrift in range(3):
             if firstdrift+firstnextdrift==0 or firstdrift+firstnextdrift==2*maxdrift+2:
@@ -79,4 +81,6 @@ def setZprobtable(JointDriftProbTable,maxdrift,ps):
                                 else:
                                     Zprob=pow(1-ps,2*delinscount[0]+delinscount[1]-nofs)*pow(ps/3,nofs)
                                 ZProbTable[firstdrift][firstnextdrift][seconddrift][secondnextdrift][thirddrift][thirdnextdrift][nofs]=DriftProb*Zprob
+    #max_indice=np.argwhere(ZProbTable==ZProbTable.max())
+    #print(max_indice[0:100])
     return ZProbTable

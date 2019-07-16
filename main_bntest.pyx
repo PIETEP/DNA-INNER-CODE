@@ -7,6 +7,7 @@ from numpy.random import *
 import decode
 import factor_graph
 import joint_graph
+import Levenshtein
 import setdriftprobtable
 
 def Readparam(filename):
@@ -50,7 +51,7 @@ def entropy(priorlist):
 
 
 def GetRndWord(block_length,period,priorlist):
-    cordword=[]
+    cordword=""
     for i in range(block_length):
         flag=0
         count=0
@@ -61,7 +62,7 @@ def GetRndWord(block_length,period,priorlist):
             #print(i%period,count)
             pool+=priorlist[i % period][count]
             if temp <= pool:
-                cordword.append(bin(count))
+                cordword+=str(count)
                 flag=1
             count+=1
     #print(cordword)
@@ -69,7 +70,7 @@ def GetRndWord(block_length,period,priorlist):
 
 def substitution(enki,probability):
     temp = rand()
-    Nucleotide = [bin(0), bin(1), bin(2), bin(3)]
+    Nucleotide = ["0", "1", "2", "3"]
     Nucleotide.remove(enki)
     if temp <= (1 / probability):
         return Nucleotide[0]
@@ -83,8 +84,8 @@ def substitution(enki,probability):
 def transmit(block_length,pa,pd,pi,maxdrift,cordword,ps):
     drift=[int(0)]
     state=[]
-    Zprime=[]
-    Z=[]
+    Zprime=""
+    Z=""
     for i in range(block_length+maxdrift):
         #state
         if rand()<=pa:
@@ -114,19 +115,19 @@ def transmit(block_length,pa,pd,pi,maxdrift,cordword,ps):
         if i+drift[i]>=block_length:
             break;
         else:
-            Zprime.append(cordword[i+drift[i]])
+            Zprime+=cordword[i+drift[i]]
             #Z
             if state[i]==1:
-                Z.append(substitution(Zprime[i],3))
+                Z+=substitution(Zprime[i],3)
             else:
                 if rand()>ps:
-                    Z.append(Zprime[i])
+                    Z+=Zprime[i]
                 else:
-                    Z.append(substitution(Zprime[i],3))
+                    Z+=substitution(Zprime[i],3)
 
 
     #print(drift,state,Zprime,Z)
-    return Z
+    return Z,drift
 
 def SetPriorCordword(cordword,block_length,priorlist,period,nofcopy):
     PriorCordword=[]
@@ -165,6 +166,15 @@ def simulate(a,b):
     rawerrorcount=0
     decodeerrorcount=0
     decode_word_error_count=0
+    raw_levenshteincount=0
+    raw_insertioncount=0
+    raw_deletioncount=0
+    raw_substitutioncount=0
+    decode_levenshteincount=0
+    decode_insertion_count=0
+    decode_deletion_count=0
+    decode_substitutioncount=0
+    mincorrectprob=np.zeros(10)
 
     #print(setdriftprobtable.setprobtable(maxdrift,pd,pi,ps))
     ZProbTable=setdriftprobtable.setprobtable(maxdrift,pd,pi,ps)
@@ -173,8 +183,11 @@ def simulate(a,b):
         wordcount+=1
         cordword=GetRndWord(block_length,period,priorlist)
         CopyZ = []
+        Copydrift=[]
         for copy_index in range(nofcopy):
-            CopyZ.append(transmit(block_length, pa, pd,pi,maxdrift, cordword, ps))
+            Z,drift=transmit(block_length, pa, pd,pi,maxdrift, cordword, ps)
+            CopyZ.append(Z)
+            Copydrift.append(drift)
             flag=0
             for i in range(min(len(cordword), len(CopyZ[copy_index]))):
                 if cordword[i] != CopyZ[copy_index][i]:
@@ -182,25 +195,38 @@ def simulate(a,b):
                     if flag==0:
                         flag=1
                         worderrorcount+=1
-        print(CopyZ)
+            levenshtein,insertion,deletion,substitution=Levenshtein.levenshtein_distance(cordword,CopyZ[copy_index])
+            raw_levenshteincount+=levenshtein
+            raw_insertioncount+=insertion
+            raw_deletioncount+=deletion
+            raw_substitutioncount+=substitution
+
+        #print(CopyZ)
         NextPrior=np.tile(priorlist,(int(block_length/period),1))
         #print('initialPrior',NextPrior,NextPrior.shape)
                 #print(decode_word)
-        
         #decoderrorcount_plus,decode_word_error_count_plus=decode(block_length,CopyZ,cordword,decordtimes,maxdrift,nofcopy,NextPrior,period,pid,ps,priorlist)
-        decodeerrorcount_plus,decode_word_error_count_plus=decode.joint_decode(block_length,cordword,CopyZ,maxdrift,nofcopy,NextPrior,period,pd,pi,ps,priorlist,ZProbTable)
+        decodeerrorcount_plus,decode_word_error_count_plus,correctlist,leven,ins,dele,sub=decode.joint_decode(block_length,cordword,Copydrift,CopyZ,maxdrift,nofcopy,NextPrior,period,pd,pi,ps,ZProbTable)
         
         decodeerrorcount+=decodeerrorcount_plus
         decode_word_error_count+=decode_word_error_count_plus
-        print(wordcount)
-        print(worderrorcount)
-        print(decode_word_error_count)
-
-    print('Word Count:%d' % (wordcount))
-    print('Raw Word Error count:%d' % (worderrorcount))
-    print('decode Word error count:%d' % (decode_word_error_count))
-    print('Raw Word Error Rate:%f' % (worderrorcount/(wordcount*nofcopy)))
-    print('raw Symbol Error Rate:%f' % (rawerrorcount/(block_length*nofcopy*wordcount)))
-    print('decode Word Error Rate:%f' %(decode_word_error_count/wordcount))
-    print('decode Symbol Error Rate:%f' % (decodeerrorcount/(block_length*wordcount)))
-
+        mincorrectprob=mincorrectprob+correctlist
+        decode_levenshteincount+=leven
+        decode_insertion_count+=ins
+        decode_deletion_count+=dele
+        decode_substitutioncount+=sub
+        print('Word Count:%d' % (wordcount))
+        print('Word Error Count --- Raw:%d Decode:%d' % (worderrorcount,decode_word_error_count))
+        print('Symbol Error Count --- Raw:%d Decode:%d' % (rawerrorcount,decodeerrorcount))
+        print('Levenshtein Distance Count --- Raw:%d Decode:%d' % (raw_levenshteincount,decode_levenshteincount))
+        print('Insertion Error Count --- Raw:%d Decode:%d' % (raw_insertioncount,decode_insertion_count))
+        print('Deletion Error Count --- Raw:%d Decode:%d' % (raw_deletioncount,decode_deletion_count))
+        print('Substitution Error Count --- Raw:%d Decode:%d' % (raw_substitutioncount,decode_substitutioncount))
+        print('Word Error Rate --- Raw:%f Decode:%f' % (worderrorcount/(wordcount*nofcopy),decode_word_error_count/wordcount))
+        print('Symbol Error Rate --- Raw:%f Decode:%f' % (rawerrorcount/(block_length*wordcount*nofcopy),decodeerrorcount/(block_length*wordcount)))
+        print('Levenshtein Distance Rate --- Raw:%f Decode:%f' % (raw_levenshteincount/(block_length*wordcount*nofcopy),decode_levenshteincount/(block_length*wordcount)))
+        print('Insertion Error Rate --- Raw:%f Decode:%f' % (raw_insertioncount/(block_length*wordcount*nofcopy),decode_insertion_count/(block_length*wordcount)))
+        print('Deletion Error Rate --- Raw:%f Decode:%f' % (raw_deletioncount/(block_length*wordcount*nofcopy),decode_deletion_count/(block_length*wordcount)))
+        print('Substitution Error Rate --- Raw:%f Decode:%f' % (raw_substitutioncount/(block_length*wordcount*nofcopy),decode_substitutioncount/(block_length*wordcount)))
+        if decode_word_error_count_plus==0:
+            print('Min Correct Probability Ranking',(mincorrectprob/float((wordcount-decode_word_error_count)))) 
